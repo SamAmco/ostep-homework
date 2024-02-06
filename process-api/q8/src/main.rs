@@ -1,8 +1,7 @@
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 use std::process;
 use std::ptr;
-use std::ffi::CString;
-use std::os::raw::{c_int, c_char};
-
 
 fn main() {
     let mut pipe_ids: [c_int; 2] = [0; 2];
@@ -20,7 +19,7 @@ fn main() {
         }
         0 => {
             //First child process
-            unsafe { 
+            unsafe {
                 libc::close(pipe_ids[0]);
                 libc::dup2(pipe_ids[1], libc::STDOUT_FILENO);
                 libc::close(pipe_ids[1]);
@@ -75,11 +74,15 @@ fn execute_command(command: &str) {
         .map(|arg| CString::new(arg).expect("CString::new failed"))
         .collect();
 
-    let args_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).chain(Some(ptr::null())).collect();
+    let args_ptrs: Vec<*const c_char> = args
+        .iter()
+        .map(|s| s.as_ptr())
+        .chain(Some(ptr::null()))
+        .collect();
 
     unsafe {
         libc::execvp(args[0].as_ptr(), args_ptrs.as_ptr());
-        
+
         //We should never get here as execvp takes over
         eprintln!("execvp failed!");
         process::exit(1);
