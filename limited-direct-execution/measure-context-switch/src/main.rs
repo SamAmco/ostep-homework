@@ -1,18 +1,37 @@
-//Just print the result of the linux sys-call gettimeofday()
+pub mod pipes;
 
-use libc::{gettimeofday, timeval};
+use crate::pipes::{close_pipes, create_pipes};
+use libc::{fork, gettimeofday, sched_setaffinity, timeval};
 use std::process::exit;
 
 pub fn main() {
-    for _ in 0..100 {
-        match get_time_of_day() {
-            Ok(tv) => print_timeval(&tv),
-            Err(e) => {
-                eprintln!("{}", e);
-                exit(1);
-            }
+    //We need to create two processes and create a pipe between them to measure the context switch time.
+
+    let pipes = match create_pipes() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
         }
+    };
+
+    //Now use fork to create two child processes. They must be running on the same CPU
+    // which we can make sure of by calling sched_setaffinity() on the parent process.
+
+    unsafe {
+        let this_process = libc::getpid();
+        sched_setaffinity(this_process, 1, &1);
     }
+
+    let pid = unsafe { fork() };
+
+    if pid < 0 {
+        eprintln!("fork failed");
+        exit(1);
+    }
+
+    //At the end close the pipes
+    close_pipes(&pipes);
 }
 
 fn print_timeval(tv: &timeval) {
